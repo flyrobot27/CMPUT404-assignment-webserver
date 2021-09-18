@@ -1,6 +1,6 @@
 #  coding: utf-8 
 import socketserver
-
+import os
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,7 +32,42 @@ class MyWebServer(socketserver.BaseRequestHandler):
     def handle(self):
         self.data = self.request.recv(1024).strip()
         print ("Got a request of: %s\n" % self.data)
-        self.request.sendall(bytearray("OK",'utf-8'))
+        
+        httpHeaders = str(self.data).split("\\r\\n")
+        requestData = httpHeaders[0].split()
+        httpRequestCD = requestData[0][2:].strip()
+        print("\"" + httpRequestCD + "\"")
+
+        #Handle get request
+        if (httpRequestCD == 'GET'):
+
+            getFileLoc = requestData[1]
+            print("Requested file location:", getFileLoc)
+            self.send_request_file(getFileLoc)
+        #Handle other request
+        else:
+            if httpRequestCD in ["POST", "PUT", "DELETE"]:
+                print("Unhandled request in POST/PUT/DELETE")
+            else:
+                print("Not Implemented")
+
+            self.request.sendall(bytes("HTTP/1.1 405 Method Not Allowed\n", "utf-8"))
+
+        self.request.close()
+
+    def send_request_file(self, location):
+        location = str(location).strip()
+        currentFileLocation = os.path.dirname(os.path.abspath(__file__))
+        if location == "/":
+            # send OK HTTP code and set content type
+            self.request.send(bytes("HTTP/1.1 200 OK\n", "utf-8"))
+            self.request.send(bytes("Content-Type: text/html\n\n", "utf-8"))
+
+            with open(currentFileLocation + "/www/index.html", 'rb') as indexFile: # read bytes of the index file
+                self.request.sendfile(indexFile)
+        
+            
+
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
@@ -43,4 +78,10 @@ if __name__ == "__main__":
 
     # Activate the server; this will keep running until you
     # interrupt the program with Ctrl-C
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        exit()
+    except Exception as e:
+        print(e.args)
+        exit(1)
