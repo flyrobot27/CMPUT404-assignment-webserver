@@ -1,6 +1,8 @@
 #  coding: utf-8 
+from posixpath import abspath
 import socketserver
 import os
+from typing import final
 # Copyright 2021 Abram Hindle, Eddie Antonio Santos, Steven Heung
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -45,24 +47,30 @@ class MyWebServer(socketserver.BaseRequestHandler):
         if DEBUG:
             print("\"" + httpRequestCD + "\"")
 
-        #Handle get request
-        if (httpRequestCD == 'GET'):
+        #Handle request
+        try:
+            if (httpRequestCD == 'GET'):
 
-            getFileLoc = requestData[1]
-            print("Requested file location:", getFileLoc)
-            self.__handle_get_request(getFileLoc)
+                getFileLoc = requestData[1]
+                print("Requested file location:", getFileLoc)
+                self.__handle_get_request(getFileLoc)
 
-        #Handle other request
-        else:
+            #Handle other request
+            else:
+                if DEBUG:
+                    if httpRequestCD in ["POST", "PUT", "DELETE"]:
+                        print("Unhandled request in POST/PUT/DELETE")
+                    else:
+                        print("Not Implemented:", httpRequestCD)
+                self.request.sendall(bytes("HTTP/1.1 405 Method Not Allowed\n", "utf-8"))
+        except Exception as e:
+            #Something went wrong
             if DEBUG:
-                if httpRequestCD in ["POST", "PUT", "DELETE"]:
-                    print("Unhandled request in POST/PUT/DELETE")
-                else:
-                    print("Not Implemented:", httpRequestCD)
-
-            self.request.sendall(bytes("HTTP/1.1 405 Method Not Allowed\n", "utf-8"))
-
-        self.request.close()
+                print("Error:", e.args)
+                print(e.with_traceback)
+            self.request.sendall(bytes("HTTP/1.1 500 Internal Server Error\n", "utf-8"))
+        finally:
+            self.request.close()
 
     def __handle_get_request(self, location):
         """handle GET request"""
@@ -78,23 +86,21 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
             # check if the directory have an index.html
             if os.path.isfile(file):
-                self.__read_and_send_file(file, "text/html")
+                self.__read_and_send_file(file, contentType="text/html")
             else:
                 if DEBUG:
                     print("Page do not have index.html")
                 self.request.sendall(bytes("HTTP/1.1 404 Not Found\n", "utf-8"))
 
-        # check if target is a file. If so, try to fetch the file
-        elif os.path.isfile(target):
+        # check if target is a valid file. If so, try to fetch the file
+        elif self.__verify_file(target):
             file_type = target.split('/')[-1].split('.')[-1]
             if file_type == "css":
-                self.__read_and_send_file(target, "text/css")
+                self.__read_and_send_file(target, contentType="text/css")
             elif file_type == "html":
-                self.__read_and_send_file(target, "text/html")
+                self.__read_and_send_file(target, contentType="text/html")
             else:
-                if DEBUG:
-                    print("Unable to find file")
-                self.request.sendall(bytes("HTTP/1.1 404 Not Found\n", "utf-8"))
+                self.__read_and_send_file(target)
 
         # unable to find director or file
         else:
@@ -114,22 +120,32 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 # Send 404
                 if DEBUG:
                     print("Unable to find page")
-
                 self.request.sendall(bytes("HTTP/1.1 404 Not Found\n", "utf-8"))
     
-    def __read_and_send_file(self, filePath, contentType):
+    def __read_and_send_file(self, filePath, contentType=None):
         """Read html/css and send them to the request"""
         # get the current directory
 
         # send OK HTTP code and set content type
         self.request.sendall(bytes("HTTP/1.1 200 OK\n", "utf-8"))
-        self.request.sendall(bytes("Content-Type: {0}\n\n".format(contentType.strip()), "utf-8"))
+
+        if contentType: #if content type is set, send the content type
+            self.request.sendall(bytes("Content-Type: {0}\n\n".format(contentType.strip()), "utf-8"))
         
         # read bytes of the index file
         with open(filePath, 'r') as indexFile: 
             self.request.sendall(bytes(indexFile.read(), "utf-8"))
             
+    def __verify_file(self, target):
+        """Verify if the file exists or if it is inside the www directory"""
+        if os.path.isfile(target):
+            baseWWWLocation = os.path.dirname(os.path.abspath(__file__)) + "/www"
+            fileAbsPath = os.path.abspath(target) # find the absolute path of the file
+            print("File Absolute Path:", fileAbsPath)
+            if baseWWWLocation in fileAbsPath: # check if absolute path is in the www directory
+                return True
 
+        return False
 
 if __name__ == "__main__":
     HOST, PORT = "127.0.0.1", 8080
