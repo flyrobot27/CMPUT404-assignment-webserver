@@ -96,7 +96,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
                     print("Unable to find file")
                 self.request.sendall(bytes("HTTP/1.1 404 Not Found\n", "utf-8"))
 
-        # unable to fild director or file
+        # unable to find director or file
         else:
             # try to check if URL is improperly entered
             dirFix = target + '/'
@@ -109,7 +109,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 if DEBUG:
                     print("DIR exists after fixing")
                 self.request.sendall(bytes("HTTP/1.1 301 Moved Permanently\n", "utf-8"))
-                self.request.sendall(bytes("Location: http://{}:{}{}\r\n".format(HOST, PORT, str(location).strip()+ "/"), "utf-8"))
+                self.request.sendall(bytes("Location: http://{}:{}{}\r\n".format(HOST, PORT, str(location).strip()+ '/'), "utf-8"))
             else:
                 # Send 404
                 if DEBUG:
