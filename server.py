@@ -1,7 +1,7 @@
 #  coding: utf-8 
 import socketserver
 import os
-# Copyright 2013 Abram Hindle, Eddie Antonio Santos
+# Copyright 2021 Abram Hindle, Eddie Antonio Santos, Steven Heung
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ import os
 #
 #
 # Furthermore it is derived from the Python documentation examples thus
-# some of the code is Copyright © 2001-2013 Python Software
+# some of the code is Copyright © 2001-2021 Python Software
 # Foundation; All Rights Reserved
 #
 # http://docs.python.org/2/library/socketserver.html
@@ -26,51 +26,113 @@ import os
 
 # try: curl -v -X GET http://127.0.0.1:8080/
 
+DEBUG = True
 
+## This assignment is heavily referenced from lab 2 regarding sending files
+## Author 
 class MyWebServer(socketserver.BaseRequestHandler):
     
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
+
+        if DEBUG:
+            print ("\nGot a request of: %s\n" % self.data)
         
         httpHeaders = str(self.data).split("\\r\\n")
         requestData = httpHeaders[0].split()
         httpRequestCD = requestData[0][2:].strip()
-        print("\"" + httpRequestCD + "\"")
+
+        if DEBUG:
+            print("\"" + httpRequestCD + "\"")
 
         #Handle get request
         if (httpRequestCD == 'GET'):
 
             getFileLoc = requestData[1]
             print("Requested file location:", getFileLoc)
-            self.send_request_file(getFileLoc)
+            self.__handle_get_request(getFileLoc)
+
         #Handle other request
         else:
-            if httpRequestCD in ["POST", "PUT", "DELETE"]:
-                print("Unhandled request in POST/PUT/DELETE")
-            else:
-                print("Not Implemented")
+            if DEBUG:
+                if httpRequestCD in ["POST", "PUT", "DELETE"]:
+                    print("Unhandled request in POST/PUT/DELETE")
+                else:
+                    print("Not Implemented:", httpRequestCD)
 
             self.request.sendall(bytes("HTTP/1.1 405 Method Not Allowed\n", "utf-8"))
 
         self.request.close()
 
-    def send_request_file(self, location):
-        location = str(location).strip()
-        currentFileLocation = os.path.dirname(os.path.abspath(__file__))
-        if location == "/":
-            # send OK HTTP code and set content type
-            self.request.send(bytes("HTTP/1.1 200 OK\n", "utf-8"))
-            self.request.send(bytes("Content-Type: text/html\n\n", "utf-8"))
+    def __handle_get_request(self, location):
+        """handle GET request"""
+        baseWWWLocation = os.path.dirname(os.path.abspath(__file__)) + "/www"
+        target = baseWWWLocation + str(location).strip()
 
-            with open(currentFileLocation + "/www/index.html", 'rb') as indexFile: # read bytes of the index file
-                self.request.sendfile(indexFile)
+        if DEBUG:
+            print("Current target:", target)
+
+        # check if target is a directory and properly enclosed with '/'. If so, show the index.html
+        if os.path.isdir(target) and target[-1] == '/':
+            file = target + "index.html"
+
+            # check if the directory have an index.html
+            if os.path.isfile(file):
+                self.__read_and_send_file(file, "text/html")
+            else:
+                if DEBUG:
+                    print("Page do not have index.html")
+                self.request.sendall(bytes("HTTP/1.1 404 Not Found\n", "utf-8"))
+
+        # check if target is a file. If so, try to fetch the file
+        elif os.path.isfile(target):
+            file_type = target.split('/')[-1].split('.')[-1]
+            if file_type == "css":
+                self.__read_and_send_file(target, "text/css")
+            elif file_type == "html":
+                self.__read_and_send_file(target, "text/html")
+            else:
+                if DEBUG:
+                    print("Unable to find file")
+                self.request.sendall(bytes("HTTP/1.1 404 Not Found\n", "utf-8"))
+
+        # unable to fild director or file
+        else:
+            # try to check if URL is improperly entered
+            dirFix = target + '/'
+
+            if DEBUG:
+                print("Fixed DIR:", dirFix)
+
+            if os.path.isdir(dirFix):
+                # DIR can be fixed. Redirect.
+                if DEBUG:
+                    print("DIR exists after fixing")
+                self.request.sendall(bytes("HTTP/1.1 301 Moved Permanently\n", "utf-8"))
+                self.request.sendall(bytes("Location: http://{}:{}{}\r\n".format(HOST, PORT, str(location).strip()+ "/"), "utf-8"))
+            else:
+                # Send 404
+                if DEBUG:
+                    print("Unable to find page")
+
+                self.request.sendall(bytes("HTTP/1.1 404 Not Found\n", "utf-8"))
+    
+    def __read_and_send_file(self, filePath, contentType):
+        """Read html/css and send them to the request"""
+        # get the current directory
+
+        # send OK HTTP code and set content type
+        self.request.sendall(bytes("HTTP/1.1 200 OK\n", "utf-8"))
+        self.request.sendall(bytes("Content-Type: {0}\n\n".format(contentType.strip()), "utf-8"))
         
+        # read bytes of the index file
+        with open(filePath, 'r') as indexFile: 
+            self.request.sendall(bytes(indexFile.read(), "utf-8"))
             
 
 
 if __name__ == "__main__":
-    HOST, PORT = "localhost", 8080
+    HOST, PORT = "127.0.0.1", 8080
 
     socketserver.TCPServer.allow_reuse_address = True
     # Create the server, binding to localhost on port 8080
@@ -82,6 +144,3 @@ if __name__ == "__main__":
         server.serve_forever()
     except KeyboardInterrupt:
         exit()
-    except Exception as e:
-        print(e.args)
-        exit(1)
