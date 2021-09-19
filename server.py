@@ -31,7 +31,10 @@ from typing import final
 DEBUG = True
 
 ## This assignment is heavily referenced from lab 2 regarding sending files
-## Author 
+## Author: Zoe Rieli
+## This assignment is also referenced from MDN Web Docs for HTTP Codes and their formats
+## Author: Mozilla
+## URL: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
 class MyWebServer(socketserver.BaseRequestHandler):
     
     def handle(self):
