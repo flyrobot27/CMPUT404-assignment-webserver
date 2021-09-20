@@ -65,13 +65,12 @@ class MyWebServer(socketserver.BaseRequestHandler):
                         print("Unhandled request in POST/PUT/DELETE")
                     else:
                         print("Not Implemented:", httpRequestCD)
-                self.request.sendall(bytes("HTTP/1.1 405 Method Not Allowed\n", "utf-8"))
+                self.request.sendall(bytes("HTTP/1.1 405 Method Not Allowed\r\n\r\n", "utf-8"))
         except Exception as e:
             #Something went wrong
             if DEBUG:
-                print("Error:", e.args)
-                print(e.with_traceback)
-            self.request.sendall(bytes("HTTP/1.1 500 Internal Server Error\n", "utf-8"))
+                print("Error:", str(e))
+            self.request.sendall(bytes("HTTP/1.1 500 Internal Server Error\r\n\r\n", "utf-8"))
         finally:
             self.request.close()
 
@@ -93,7 +92,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
             else:
                 if DEBUG:
                     print("Page do not have index.html")
-                self.request.sendall(bytes("HTTP/1.1 404 Not Found\n", "utf-8"))
+                self.request.sendall(bytes("HTTP/1.1 404 Not Found\r\n", "utf-8"))
 
         # check if target is a valid file. If so, try to fetch the file
         elif self.__verify_file(target):
@@ -117,28 +116,28 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 # DIR can be fixed. Redirect.
                 if DEBUG:
                     print("DIR exists after fixing")
-                self.request.sendall(bytes("HTTP/1.1 301 Moved Permanently\n", "utf-8"))
-                self.request.sendall(bytes("Location: http://{}:{}{}\r\n".format(HOST, PORT, str(location).strip()+ '/'), "utf-8"))
+                self.request.sendall(bytes("HTTP/1.1 301 Moved Permanently\r\n", "utf-8"))
+                self.request.sendall(bytes("Location: http://{}:{}{}\r\n\r\n".format(HOST, PORT, str(location).strip()+ '/'), "utf-8"))
             else:
                 # Send 404
                 if DEBUG:
                     print("Unable to find page")
-                self.request.sendall(bytes("HTTP/1.1 404 Not Found\n", "utf-8"))
+                self.request.sendall(bytes("HTTP/1.1 404 Not Found\r\n\r\n", "utf-8"))
     
     def __read_and_send_file(self, filePath, contentType=None):
         """Read html/css and send them to the request"""
         # get the current directory
 
         # send OK HTTP code and set content type
-        self.request.sendall(bytes("HTTP/1.1 200 OK\n", "utf-8"))
+        self.request.sendall(bytes("HTTP/1.1 200 OK\r\n", "utf-8"))
 
         if contentType: #if content type is set, send the content type
-            self.request.sendall(bytes("Content-Type: {0}\n\n".format(contentType.strip()), "utf-8"))
+            self.request.sendall(bytes("Content-Type: {0}\r\n\r\n".format(contentType.strip()), "utf-8"))
         
         # read bytes of the file
         with open(filePath, 'r') as file: 
             self.request.sendall(bytes(file.read(), "utf-8"))
-            
+
     def __verify_file(self, target):
         """Verify if the file exists or if it is inside the www directory"""
         if os.path.isfile(target):
