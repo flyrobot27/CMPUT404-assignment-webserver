@@ -135,9 +135,9 @@ class MyWebServer(socketserver.BaseRequestHandler):
         if contentType: #if content type is set, send the content type
             self.request.sendall(bytes("Content-Type: {0}\n\n".format(contentType.strip()), "utf-8"))
         
-        # read bytes of the index file
-        with open(filePath, 'r') as indexFile: 
-            self.request.sendall(bytes(indexFile.read(), "utf-8"))
+        # read bytes of the file
+        with open(filePath, 'r') as file: 
+            self.request.sendall(bytes(file.read(), "utf-8"))
             
     def __verify_file(self, target):
         """Verify if the file exists or if it is inside the www directory"""
