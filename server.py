@@ -1,8 +1,8 @@
 #  coding: utf-8 
-from posixpath import abspath
 import socketserver
 import os
-from typing import final
+import re
+
 # Copyright 2021 Abram Hindle, Eddie Antonio Santos, Steven Heung
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -144,8 +144,16 @@ class MyWebServer(socketserver.BaseRequestHandler):
         if os.path.isfile(target):
             baseWWWLocation = os.path.dirname(os.path.abspath(__file__)) + "/www"
             fileAbsPath = os.path.abspath(target) # find the absolute path of the file
-            print("File Absolute Path:", fileAbsPath)
-            if baseWWWLocation in fileAbsPath: # check if absolute path is in the www directory
+
+            #using regex to check if the final directory starts with the base WWW location
+            expression = "^" + baseWWWLocation + ".*"
+            result = re.search(expression, fileAbsPath)
+            if DEBUG:
+                print("File Absolute Path:", fileAbsPath)
+                print("Regex expression:", expression)
+                print("Regex result:", result)
+            
+            if result:
                 return True
 
         return False
