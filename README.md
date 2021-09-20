@@ -26,3 +26,11 @@ compatible) http://docs.python.org/2/library/socketserver.html
 
 This is the submission for Assignment 1 by Steven Heung (CCID: syheung)
 
+References
+========================
+
+This assignment is heavily referenced from lab 2 regarding sending files
+Author: Zoe Rieli
+This assignment is also referenced from MDN Web Docs for HTTP Codes and their formats
+Author: Mozilla
+URL: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
