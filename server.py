@@ -133,6 +133,8 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
         if contentType: #if content type is set, send the content type
             self.request.sendall(bytes("Content-Type: {0}\r\n\r\n".format(contentType.strip()), "utf-8"))
+        else: # close the header
+            self.request.sendall(bytes("\r\n", "utf-8"))
         
         # read bytes of the file
         with open(filePath, 'r') as file: 
