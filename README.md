@@ -38,3 +38,9 @@ This assignment is also referenced from MDN Web Docs for HTTP Codes and their fo
 Author: Mozilla
 
 URL: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+
+Formatting datetime to HTTP1.1 spec is taken from stack overflow
+
+Author: Florian Bösch
+
+URL: https://stackoverflow.com/posts/225106/revisions
