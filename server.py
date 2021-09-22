@@ -2,6 +2,7 @@
 import socketserver
 import os
 import re
+import datetime, locale
 
 # Copyright 2021 Abram Hindle, Eddie Antonio Santos, Steven Heung
 # 
@@ -66,11 +67,15 @@ class MyWebServer(socketserver.BaseRequestHandler):
                     else:
                         print("Not Implemented:", httpRequestCD)
                 self.request.sendall(bytes("HTTP/1.1 405 Method Not Allowed\r\n\r\n", "utf-8"))
+                now = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+                self.request.sendall(bytes("Date: {0}\r\nContent-Length: 0\r\nConnection: close\r\n".format(now), "utf-8"))
         except Exception as e:
             #Something went wrong
             if DEBUG:
                 print("Error:", str(e))
             self.request.sendall(bytes("HTTP/1.1 500 Internal Server Error\r\n\r\n", "utf-8"))
+            now = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+            self.request.sendall(bytes("Date: {0}\r\nContent-Length: 0\r\nConnection: close\r\n".format(now), "utf-8"))
         finally:
             self.request.close()
 
@@ -93,6 +98,8 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 if DEBUG:
                     print("Page do not have index.html")
                 self.request.sendall(bytes("HTTP/1.1 404 Not Found\r\n", "utf-8"))
+                now = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+                self.request.sendall(bytes("Date: {0}\r\nContent-Length: 0\r\nConnection: close\r\n".format(now), "utf-8"))
 
         # check if target is a valid file. If so, try to fetch the file
         elif self.__verify_file(target):
@@ -118,18 +125,41 @@ class MyWebServer(socketserver.BaseRequestHandler):
                     print("DIR exists after fixing")
                 self.request.sendall(bytes("HTTP/1.1 301 Moved Permanently\r\n", "utf-8"))
                 self.request.sendall(bytes("Location: http://{}:{}{}\r\n\r\n".format(HOST, PORT, str(location).strip()+ '/'), "utf-8"))
+
+                now = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+                self.request.sendall(bytes("Date: {0}\r\nContent-Length: 0\r\nConnection: close\r\n".format(now), "utf-8"))
+
             else:
                 # Send 404
                 if DEBUG:
                     print("Unable to find page")
                 self.request.sendall(bytes("HTTP/1.1 404 Not Found\r\n\r\n", "utf-8"))
+                now = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+                self.request.sendall(bytes("Date: {0}\r\nContent-Length: 0\r\nConnection: close\r\n".format(now), "utf-8"))
     
     def __read_and_send_file(self, filePath, contentType=None):
         """Read html/css and send them to the request"""
-        # get the current directory
 
         # send OK HTTP code and set content type
         self.request.sendall(bytes("HTTP/1.1 200 OK\r\n", "utf-8"))
+
+        # Formatting datetime to HTTP1.1 spec is taken from stack overflow
+        # Author: Florian Bösch
+        # URL: https://stackoverflow.com/posts/225106/revisions
+
+        now = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+        if DEBUG:
+            print("Date:", now)
+
+        self.request.sendall(bytes("Date: {0}\r\n".format(now), "utf-8"))
+
+        # get content size
+        size = os.path.getsize(filePath)
+        if DEBUG:
+            print("Content length:", size)
+        self.request.sendall(bytes("Content-Length: {0}\r\n".format(size), "utf-8"))
+
+        self.request.sendall(bytes("Connection: close\r\n", "utf-8"))
 
         if contentType: #if content type is set, send the content type
             self.request.sendall(bytes("Content-Type: {0}\r\n\r\n".format(contentType.strip()), "utf-8"))
