@@ -42,7 +42,7 @@ DEBUG = True
 
 class HTTPPayload:
     """ This class represents the HTTP Payload to be sent """
-    def __init__(self, httpCode, contentType=''):
+    def __init__(self, httpCode, contentType=''): 
         self.contentLength = 0
         self.httpCode = httpCode.strip()
         self.contentType = contentType.strip()
@@ -180,7 +180,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
                     print("Payload:", payload)
                 self.request.sendall(payload.toBytes())
     
-    def __read_and_send_file(self, filePath, contentType=''):
+    def __read_and_send_file(self, filePath, contentType='application/octet-stream'): # content type defaults to octet-stream
         """Read html/css and send them to the request"""
         # start file reading trasaction
         with open(filePath, 'r') as file: 
