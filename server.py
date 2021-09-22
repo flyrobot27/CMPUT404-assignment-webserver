@@ -42,14 +42,15 @@ DEBUG = True
 
 class HTTPPayload:
     """ This class represents the HTTP Payload to be sent """
-    def __init__(self, contentLength, httpCode, contentType=''):
-        self.contentLength = contentLength
+    def __init__(self, httpCode, contentType=''):
+        self.contentLength = 0
         self.httpCode = httpCode.strip()
         self.contentType = contentType.strip()
         self.body = None
 
     def addBody(self, body):
         self.body = body
+        self.contentLength = len(body.encode("utf-8"))
 
     def __str__(self) -> str:
         self.date = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
@@ -104,7 +105,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
                     else:
                         print("Not Implemented:", httpRequestCD)
                 
-                payload = HTTPPayload(contentLength=0, httpCode="405 Method Not Allowed")
+                payload = HTTPPayload(httpCode="405 Method Not Allowed")
 
                 if DEBUG:
                     print("Final payload:", payload)
@@ -115,7 +116,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
             if DEBUG:
                 print("Error:", str(e))
             
-            payload = HTTPPayload(contentLength=0, httpCode="500 Internal Server Error")
+            payload = HTTPPayload(httpCode="500 Internal Server Error")
             self.request.sendall(payload.toBytes())
 
         finally:
@@ -137,7 +138,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
             if os.path.isfile(file):
                 self.__read_and_send_file(file, contentType="text/html")
             else:
-                payload = HTTPPayload(contentLength=0, httpCode="404 Not Found")
+                payload = HTTPPayload(httpCode="404 Not Found")
                 if DEBUG:
                     print("Page do not have index.html")
                     print("Payload:", payload)
@@ -165,7 +166,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
             if os.path.isdir(dirFix):
                 # DIR can be fixed. Redirect.
                 location = "Location: http://{}:{}{}\r\n\r\n".format(HOST, PORT, str(location).strip()+ '/')
-                payload = HTTPPayload(contentLength=0, httpCode="301 Moved Permanently\r\n{}".format(location))
+                payload = HTTPPayload(httpCode="301 Moved Permanently\r\n{}".format(location))
                 if DEBUG:
                     print("DIR exists after fixing")
                     print("Payload:", payload)
@@ -173,7 +174,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
                 self.request.sendall(payload.toBytes())
             else:
                 # Send 404
-                payload = HTTPPayload(contentLength=0, httpCode="404 Not Found")
+                payload = HTTPPayload(httpCode="404 Not Found")
                 if DEBUG:
                     print("Unable to find page")
                     print("Payload:", payload)
@@ -183,10 +184,8 @@ class MyWebServer(socketserver.BaseRequestHandler):
         """Read html/css and send them to the request"""
         # start file reading trasaction
         with open(filePath, 'r') as file: 
-            # get content size
-            size = os.path.getsize(filePath)
             # send OK HTTP code and set content type
-            payload = HTTPPayload(contentLength=size, httpCode="200 OK", contentType=contentType)
+            payload = HTTPPayload(httpCode="200 OK", contentType=contentType)
             payload.addBody(file.read())
 
             if DEBUG:
