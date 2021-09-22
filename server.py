@@ -50,7 +50,7 @@ class HTTPPayload:
 
     def addBody(self, body):
         self.body = body
-        self.contentLength = len(body.encode("utf-8"))
+        self.contentLength = len(body)
 
     def __str__(self) -> str:
         self.date = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
