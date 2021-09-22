@@ -36,6 +36,43 @@ DEBUG = True
 ## This assignment is also referenced from MDN Web Docs for HTTP Codes and their formats
 ## Author: Mozilla
 ## URL: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+## Formatting datetime to HTTP1.1 spec is taken from stack overflow
+## Author: Florian Bösch
+## URL: https://stackoverflow.com/posts/225106/revisions
+
+class HTTPPayload:
+    """ This class represents the HTTP Payload to be sent """
+    def __init__(self, contentLength, httpCode, contentType=''):
+        self.contentLength = contentLength
+        self.httpCode = httpCode.strip()
+        self.contentType = contentType.strip()
+        self.body = None
+
+    def addBody(self, body):
+        self.body = body
+
+    def __str__(self) -> str:
+        self.date = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+        payload = "HTTP/1.1 {0}\r\nDate: {1}\r\nContent-Length: {2}\r\nConnection: close\r\n".format(self.httpCode, self.date, self.contentLength)
+
+        if self.contentType != '':
+            payload += "Content-Type: {0}; charset:utf-8\r\n\r\n".format(self.contentType)
+        else:
+            payload += "\r\n"
+
+        if self.body:
+            payload += self.body
+
+        return payload
+    
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def toBytes(self) -> bytes:
+        """ Convert itself to bytes with utf-8 encoding """
+        return bytes(self.__str__(), "utf-8")
+
+
 class MyWebServer(socketserver.BaseRequestHandler):
     
     def handle(self):
@@ -66,16 +103,21 @@ class MyWebServer(socketserver.BaseRequestHandler):
                         print("Unhandled request in POST/PUT/DELETE")
                     else:
                         print("Not Implemented:", httpRequestCD)
-                self.request.sendall(bytes("HTTP/1.1 405 Method Not Allowed\r\n\r\n", "utf-8"))
-                now = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
-                self.request.sendall(bytes("Date: {0}\r\nContent-Length: 0\r\nConnection: close\r\n".format(now), "utf-8"))
+                
+                payload = HTTPPayload(contentLength=0, httpCode="405 Method Not Allowed")
+
+                if DEBUG:
+                    print("Final payload:", payload)
+                self.request.sendall(payload.toBytes())
+
         except Exception as e:
             #Something went wrong
             if DEBUG:
                 print("Error:", str(e))
-            self.request.sendall(bytes("HTTP/1.1 500 Internal Server Error\r\n\r\n", "utf-8"))
-            now = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
-            self.request.sendall(bytes("Date: {0}\r\nContent-Length: 0\r\nConnection: close\r\n".format(now), "utf-8"))
+            
+            payload = HTTPPayload(contentLength=0, httpCode="500 Internal Server Error")
+            self.request.sendall(payload.toBytes())
+
         finally:
             self.request.close()
 
@@ -95,11 +137,12 @@ class MyWebServer(socketserver.BaseRequestHandler):
             if os.path.isfile(file):
                 self.__read_and_send_file(file, contentType="text/html")
             else:
+                payload = HTTPPayload(contentLength=0, httpCode="404 Not Found")
                 if DEBUG:
                     print("Page do not have index.html")
-                self.request.sendall(bytes("HTTP/1.1 404 Not Found\r\n", "utf-8"))
-                now = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
-                self.request.sendall(bytes("Date: {0}\r\nContent-Length: 0\r\nConnection: close\r\n".format(now), "utf-8"))
+                    print("Payload:", payload)
+
+                self.request.sendall(payload.toBytes())
 
         # check if target is a valid file. If so, try to fetch the file
         elif self.__verify_file(target):
@@ -121,56 +164,38 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
             if os.path.isdir(dirFix):
                 # DIR can be fixed. Redirect.
+                location = "Location: http://{}:{}{}\r\n\r\n".format(HOST, PORT, str(location).strip()+ '/')
+                payload = HTTPPayload(contentLength=0, httpCode="301 Moved Permanently\r\n{}".format(location))
                 if DEBUG:
                     print("DIR exists after fixing")
-                self.request.sendall(bytes("HTTP/1.1 301 Moved Permanently\r\n", "utf-8"))
-                self.request.sendall(bytes("Location: http://{}:{}{}\r\n\r\n".format(HOST, PORT, str(location).strip()+ '/'), "utf-8"))
+                    print("Payload:", payload)
 
-                now = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
-                self.request.sendall(bytes("Date: {0}\r\nContent-Length: 0\r\nConnection: close\r\n".format(now), "utf-8"))
-
+                self.request.sendall(payload.toBytes())
             else:
                 # Send 404
+                payload = HTTPPayload(contentLength=0, httpCode="404 Not Found")
                 if DEBUG:
                     print("Unable to find page")
-                self.request.sendall(bytes("HTTP/1.1 404 Not Found\r\n\r\n", "utf-8"))
-                now = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
-                self.request.sendall(bytes("Date: {0}\r\nContent-Length: 0\r\nConnection: close\r\n".format(now), "utf-8"))
+                    print("Payload:", payload)
+                self.request.sendall(payload.toBytes())
     
-    def __read_and_send_file(self, filePath, contentType=None):
+    def __read_and_send_file(self, filePath, contentType=''):
         """Read html/css and send them to the request"""
-
-        # send OK HTTP code and set content type
-        self.request.sendall(bytes("HTTP/1.1 200 OK\r\n", "utf-8"))
-
-        # Formatting datetime to HTTP1.1 spec is taken from stack overflow
-        # Author: Florian Bösch
-        # URL: https://stackoverflow.com/posts/225106/revisions
-
-        now = datetime.datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
-        if DEBUG:
-            print("Date:", now)
-
-        self.request.sendall(bytes("Date: {0}\r\n".format(now), "utf-8"))
-
-        # get content size
-        size = os.path.getsize(filePath)
-        if DEBUG:
-            print("Content length:", size)
-        self.request.sendall(bytes("Content-Length: {0}\r\n".format(size), "utf-8"))
-
-        self.request.sendall(bytes("Connection: close\r\n", "utf-8"))
-
-        if contentType: #if content type is set, send the content type
-            self.request.sendall(bytes("Content-Type: {0}\r\n\r\n".format(contentType.strip()), "utf-8"))
-        else: # close the header
-            self.request.sendall(bytes("\r\n", "utf-8"))
-        
-        # read bytes of the file
+        # start file reading trasaction
         with open(filePath, 'r') as file: 
-            self.request.sendall(bytes(file.read(), "utf-8"))
+            # get content size
+            size = os.path.getsize(filePath)
+            # send OK HTTP code and set content type
+            payload = HTTPPayload(contentLength=size, httpCode="200 OK", contentType=contentType)
+            payload.addBody(file.read())
 
-    def __verify_file(self, target):
+            if DEBUG:
+                print("Payload:", payload)
+            
+        self.request.sendall(payload.toBytes())
+            
+
+    def __verify_file(self, target) -> bool:
         """Verify if the file exists or if it is inside the www directory"""
         if os.path.isfile(target):
             baseWWWLocation = os.path.dirname(os.path.abspath(__file__)) + "/www"
