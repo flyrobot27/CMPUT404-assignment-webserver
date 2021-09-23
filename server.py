@@ -2,7 +2,7 @@
 import socketserver
 import os
 import re
-import datetime, locale
+import datetime
 
 # Copyright 2021 Abram Hindle, Eddie Antonio Santos, Steven Heung
 # 
@@ -42,7 +42,8 @@ DEBUG = True
 
 class HTTPPayload:
     """ This class represents the HTTP Payload to be sent """
-    def __init__(self, httpCode, contentType=''): 
+    def __init__(self, request, httpCode, contentType=''): 
+        self.request = request
         self.contentLength = 0
         self.httpCode = httpCode.strip()
         self.contentType = contentType.strip()
@@ -57,21 +58,21 @@ class HTTPPayload:
         payload = "HTTP/1.1 {0}\r\nDate: {1}\r\nContent-Length: {2}\r\nConnection: close\r\n".format(self.httpCode, self.date, self.contentLength)
 
         if self.contentType != '':
-            payload += "Content-Type: {0}; charset:utf-8\r\n\r\n".format(self.contentType)
+            payload += "Content-Type: {0}\r\n\r\n".format(self.contentType)
         else:
             payload += "\r\n"
-
-        if self.body:
-            payload += self.body
 
         return payload
     
     def __repr__(self) -> str:
         return self.__str__()
 
-    def toBytes(self) -> bytes:
+    def sendPayload(self):
         """ Convert itself to bytes with utf-8 encoding """
-        return bytes(self.__str__(), "utf-8")
+        self.request.sendall(bytes(self.__str__(), "utf-8"))
+
+        if self.body: #check if a body is set
+            self.request.sendall(self.body)
 
 
 class MyWebServer(socketserver.BaseRequestHandler):
@@ -105,20 +106,20 @@ class MyWebServer(socketserver.BaseRequestHandler):
                     else:
                         print("Not Implemented:", httpRequestCD)
                 
-                payload = HTTPPayload(httpCode="405 Method Not Allowed")
+                payload = HTTPPayload(request=self.request, httpCode="405 Method Not Allowed")
 
                 if DEBUG:
                     print("Final payload:", payload)
-                self.request.sendall(payload.toBytes())
-
+                payload.sendPayload()
+        
         except Exception as e:
             #Something went wrong
             if DEBUG:
                 print("Error:", str(e))
             
-            payload = HTTPPayload(httpCode="500 Internal Server Error")
-            self.request.sendall(payload.toBytes())
-
+            payload = HTTPPayload(request=self.request, httpCode="500 Internal Server Error")
+            payload.sendPayload()
+        
         finally:
             self.request.close()
 
@@ -138,12 +139,12 @@ class MyWebServer(socketserver.BaseRequestHandler):
             if os.path.isfile(file):
                 self.__read_and_send_file(file, contentType="text/html")
             else:
-                payload = HTTPPayload(httpCode="404 Not Found")
+                payload = HTTPPayload(request=self.request, httpCode="404 Not Found")
                 if DEBUG:
                     print("Page do not have index.html")
                     print("Payload:", payload)
 
-                self.request.sendall(payload.toBytes())
+                payload.sendPayload()
 
         # check if target is a valid file. If so, try to fetch the file
         elif self.__verify_file(target):
@@ -166,34 +167,30 @@ class MyWebServer(socketserver.BaseRequestHandler):
             if os.path.isdir(dirFix):
                 # DIR can be fixed. Redirect.
                 location = "Location: http://{}:{}{}\r\n\r\n".format(HOST, PORT, str(location).strip()+ '/')
-                payload = HTTPPayload(httpCode="301 Moved Permanently\r\n{}".format(location))
+                payload = HTTPPayload(request=self.request, httpCode="301 Moved Permanently\r\n{}".format(location))
                 if DEBUG:
                     print("DIR exists after fixing")
                     print("Payload:", payload)
-
-                self.request.sendall(payload.toBytes())
+                payload.sendPayload()
             else:
                 # Send 404
-                payload = HTTPPayload(httpCode="404 Not Found")
+                payload = HTTPPayload(request=self.request, httpCode="404 Not Found")
                 if DEBUG:
                     print("Unable to find page")
                     print("Payload:", payload)
-                self.request.sendall(payload.toBytes())
+                payload.sendPayload()
     
     def __read_and_send_file(self, filePath, contentType='application/octet-stream'): # content type defaults to octet-stream
         """Read html/css and send them to the request"""
         # start file reading trasaction
-        with open(filePath, 'r') as file: 
+        with open(filePath, 'rb') as file: # read file as bytes
             # send OK HTTP code and set content type
-            payload = HTTPPayload(httpCode="200 OK", contentType=contentType)
+            payload = HTTPPayload(request=self.request, httpCode="200 OK", contentType=contentType)
             payload.addBody(file.read())
-
             if DEBUG:
                 print("Payload:", payload)
+            payload.sendPayload()
             
-        self.request.sendall(payload.toBytes())
-            
-
     def __verify_file(self, target) -> bool:
         """Verify if the file exists or if it is inside the www directory"""
         if os.path.isfile(target):
